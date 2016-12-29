@@ -5,13 +5,13 @@ import sys
 import time
 import urllib.request as ur
 
-class data_helper():
+class data_helper_baidu():
     
     def __init__(self, sid, store_path):
         self._sid = sid
         self._store_path = store_path
-        self._url = "http://yunhq.sse.com.cn:32041/v1/sh1/snap/" + sid + "?select=name,last,chg_rate,change,amount,volume,open,prev_close,ask,bid,high,low,tradephase"
-        self._dir_path = "/".join([self._store_path, self._sid])
+        self._url = "http://apis.baidu.com/apistore/stockservice/stock?stockid=" + sid + "&list=1"
+        self._dir_path ="/".join([store_path, sid])
         if not os.path.exists(self._dir_path):
             os.mkdir(self._dir_path)
 
@@ -23,8 +23,8 @@ class data_helper():
         while True:
             flag, dic = self.get_data()
             if flag == 0:
-                if (int(dic['time']) < 093000) or (int(dic['time']) > 113000 and int(dic['time']) < 130000) or (int(dic['time']) > 150000):
-                    continue
+                dic['date'] = dic['date'].replace("-", "")
+                dic['time'] = dic['time'].replace(":", "")
                 now_dt = str(dic['date']) + str(dic['time'])
                 if now_dt and prev_dt and int(now_dt) <= int(prev_dt):
                     if int(now_dt) == int(prev_dt):
@@ -49,28 +49,38 @@ class data_helper():
             time.sleep(time_gap)
    
     def parse_data(self, dic):
-        t = str(dic['time'])
-        d = str(dic['date'])
-        data = dic['snap']
-        res = [d, t] + data[1:8] + data[8] + data[9] + data[10:]
-        return "\t".join([str(x) for x in res])
+        key = ["date", "time", "OpenningPrice", "closingPrice", "currentPrice", "currentPrice", "hPrice",
+                "lPrice", "competitivePrice", "auctionPrice", "totalNumber", "turnover", "increase", 
+                "buyOne", "buyOnePrice", "buyTwo", "buyTwoPrice", "buyThree", "buyThreePrice",
+                "buyFour", "buyFourPrice", "buyFive", "buyFivePrice", "sellOne", "sellOnePrice",
+                "sellTwo", "sellTwoPrice", "sellThree", "sellThreePrice", "sellFour", "sellFourPrice",
+                "sellFive", "sellFivePrice"]
+        data = [dic[x] for x in key]
+        return "\t".join([str(x) for x in data])
  
-    def get_data(self, encoding = "GBK"):
+    def get_data(self, encoding = "GBK", api_key = "d5dfd9fbaab089b49d8cc0ec123db340"):
         b_content = b""
         try:
             req = ur.Request(self._url)
+            req.add_header("apikey", api_key)
             response = ur.urlopen(req)
             b_content = response.read()
         except Exception as e:
             return -1, str(e)
         content = b_content.decode(encoding)
         content = json.loads(content)
-        return 0, content
+        if "retData" not in content or "stockinfo" not in content["retData"]:
+            return -2, "empty response."
+        content = content["retData"]["stockinfo"][0]
+        if content:
+            return 0, content
+        else:
+            return -2, "empty response."
 
     def get_time(self):
         return time.strftime("%Y-%m-%d %H:%M:%S",time.localtime(time.time()))
 
 
 if __name__ == "__main__":
-    dh = data_helper(sys.argv[1], sys.argv[2])
+    dh = data_helper_baidu(sys.argv[1], sys.argv[2])
     dh()
